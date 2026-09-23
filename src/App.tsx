@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CountryPicker } from './components/CountryPicker'
+import { LearnGuide } from './components/LearnGuide'
 import { Explanation } from './components/Explanation'
 import { InputPanel } from './components/InputPanel'
 import { PPFChart } from './components/PPFChart'
@@ -10,6 +11,8 @@ import { goodIcon, goodLabel, type GoodChoice } from './data/goods'
 import { PRESETS, type Preset } from './data/presets'
 import { fmt, signed } from './format'
 import { countryFlag, countryName, LangContext, STRINGS, useI18n, type Lang } from './i18n'
+import { LEARN_TEXT, STEP, STEP_FOCUS, type LearnFocus } from './learn/content'
+import { reveal, type LearnState, type TaskId } from './learn/logic'
 import { solve, type CountryInput, type PriceMode } from './model/ricardian'
 
 type Slot = 'A' | 'B'
@@ -40,6 +43,7 @@ export default function App() {
   const [beta, setBeta] = useState(START.beta)
   const [priceMode, setPriceMode] = useState<PriceMode>('equilibrium')
   const [manualPrice, setManualPrice] = useState(1)
+  const [learn, setLearn] = useState<LearnState | null>(null)
 
   useEffect(() => {
     document.documentElement.lang = lang
@@ -56,6 +60,54 @@ export default function App() {
     [inputs, beta, priceMode, manualPrice],
   )
 
+  // Tick off lesson tasks as soon as the user's changes satisfy them. Updating state during render
+  // (rather than in an effect) is React's pattern for state that reacts to other state.
+  if (learn) {
+    const done: TaskId[] = []
+    if (learn.step === STEP.price && priceMode === 'manual') {
+      done.push('price-manual')
+      if (result.tradeCase === 'A-large' || result.tradeCase === 'B-large') done.push('price-edge')
+    }
+    if (learn.step === STEP.challenge) {
+      const x = result.comparativeAdvantage.X
+      if (x && learn.challengeStart && x !== learn.challengeStart) done.push('flip')
+      if (result.tradeCase === 'no-trade') done.push('equal')
+    }
+    const fresh = done.filter((id) => !learn.achieved.has(id))
+    if (fresh.length) setLearn({ ...learn, achieved: new Set([...learn.achieved, ...fresh]) })
+  }
+
+  // Bring the highlighted part of the page into view when the lesson moves on.
+  const learnStep = learn?.step
+  useEffect(() => {
+    if (learnStep === undefined) return
+    const target = STEP_FOCUS[learnStep][0]
+    const el = target ? document.getElementById(`learn-${target}`) : null
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    else window.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [learnStep])
+
+  const show = reveal(learn)
+  const focus = (area: LearnFocus) =>
+    'scroll-mt-4 rounded-2xl transition-shadow duration-300 ' +
+    (learn && STEP_FOCUS[learn.step].includes(area)
+      ? 'ring-4 ring-amber-400 ring-offset-4 ring-offset-slate-50 dark:ring-offset-slate-950'
+      : '')
+
+  const startLearn = () => {
+    setPriceMode('equilibrium')
+    setLearn({ step: 0, answers: {}, achieved: new Set(), challengeStart: null })
+  }
+
+  const goToStep = (step: number) => {
+    if (!learn) return
+    setLearn({
+      ...learn,
+      step,
+      challengeStart: step === STEP.challenge ? result.comparativeAdvantage.X : learn.challengeStart,
+    })
+  }
+
   const names = {
     A: selected.A ? countryName(selected.A, lang) : `${lang === 'ko' ? '국가' : 'Country'} A`,
     B: selected.B ? countryName(selected.B, lang) : `${lang === 'ko' ? '국가' : 'Country'} B`,
@@ -66,7 +118,7 @@ export default function App() {
   const ready = selected.A !== null && selected.B !== null && result.errors.length === 0
 
   const flows: Flow[] = []
-  if (ready && result.tradeCase !== 'no-trade') {
+  if (ready && show.flows && result.tradeCase !== 'no-trade') {
     for (const k of ['A', 'B'] as const) {
       for (const g of ['X', 'Y'] as const) {
         const v = result.countries[k].trade.netExports[g]
@@ -107,13 +159,26 @@ export default function App() {
 
   return (
     <LangContext.Provider value={{ lang, t }}>
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:py-10">
+      <div className={'mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:py-10 ' + (learn ? 'pb-[60vh]' : '')}>
         <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{t.title}</h1>
             <p className="mt-1 text-slate-500 dark:text-slate-400">{t.subtitle}</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => (learn ? setLearn(null) : startLearn())}
+              className={
+                'rounded-lg px-3 py-2 text-sm font-semibold transition ' +
+                (learn
+                  ? 'bg-amber-500 text-white hover:bg-amber-600'
+                  : 'border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300')
+              }
+              aria-pressed={learn !== null}
+            >
+              {LEARN_TEXT[lang].toggle}
+            </button>
             <select
               value={presetId ?? ''}
               onChange={(e) => {
@@ -157,9 +222,15 @@ export default function App() {
         )}
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
-          <section className="space-y-3">
+          <section id="learn-map" className={'space-y-3 ' + focus('map')}>
             <div className="flex items-stretch gap-2">
-              <CountryPicker slot="A" value={selected.A} active={activeSlot === 'A'} onActivate={() => setActiveSlot('A')} onPick={pick} />
+              <CountryPicker
+                slot="A"
+                value={selected.A}
+                active={activeSlot === 'A'}
+                onActivate={() => setActiveSlot('A')}
+                onPick={pick}
+              />
               <button
                 type="button"
                 onClick={swap}
@@ -169,14 +240,23 @@ export default function App() {
               >
                 ⇄
               </button>
-              <CountryPicker slot="B" value={selected.B} active={activeSlot === 'B'} onActivate={() => setActiveSlot('B')} onPick={pick} />
+              <CountryPicker
+                slot="B"
+                value={selected.B}
+                active={activeSlot === 'B'}
+                onActivate={() => setActiveSlot('B')}
+                onPick={pick}
+              />
             </div>
             <WorldMap selected={selected} activeSlot={activeSlot} flows={flows} onPick={pick} />
             <p className="text-center text-xs text-slate-500 dark:text-slate-400">{t.mapHint(activeSlot)}</p>
-            {ready && <Headline names={names} icons={icons} result={result} />}
+            {ready && show.flows && <Headline names={names} icons={icons} result={result} />}
           </section>
 
-          <aside className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+          <aside
+            id="learn-inputs"
+            className={`${focus(learn?.step === STEP.price ? 'price' : 'inputs')} border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900`}
+          >
             <InputPanel
               names={names}
               goods={goods}
@@ -202,30 +282,71 @@ export default function App() {
 
         {!ready ? (
           <p className="mt-10 text-center text-slate-500">{result.errors.length ? t.invalid : t.pickTwo}</p>
+        ) : !show.results ? (
+          <p className="mt-10 rounded-2xl border-2 border-dashed border-slate-200 px-4 py-12 text-center text-slate-400 dark:border-slate-800">
+            🎓 {LEARN_TEXT[lang].locked}
+          </p>
         ) : (
           <main className="mt-8 space-y-6">
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
               {(['A', 'B'] as const).map((k) => (
-                <PPFChart
-                  key={k}
-                  slot={k}
-                  title={`${countryFlag(selected[k]!)} ${t.ppfTitle(names[k])}`}
-                  result={result.countries[k]}
-                  price={result.price}
-                  goods={{ X: `${icons.X} ${names.X}`, Y: `${icons.Y} ${names.Y}` }}
-                  showTrade={result.tradeCase !== 'no-trade'}
-                />
+                <div key={k} id={k === 'A' ? 'learn-ppf' : undefined} className={focus('ppf')}>
+                  <PPFChart
+                    slot={k}
+                    title={`${countryFlag(selected[k]!)} ${t.ppfTitle(names[k])}`}
+                    result={result.countries[k]}
+                    price={result.price}
+                    goods={{ X: `${icons.X} ${names.X}`, Y: `${icons.Y} ${names.Y}` }}
+                    showTrade={show.price && result.tradeCase !== 'no-trade'}
+                  />
+                </div>
               ))}
-              <RSRDChart result={result} beta={beta} priceMode={priceMode} goods={{ X: names.X, Y: names.Y }} />
+              {show.price ? (
+                <div id="learn-rsrd" className={focus('rsrd')}>
+                  <RSRDChart result={result} beta={beta} priceMode={priceMode} goods={{ X: names.X, Y: names.Y }} />
+                </div>
+              ) : (
+                <div className="grid place-items-center rounded-2xl border-2 border-dashed border-slate-200 p-6 text-center text-sm text-slate-400 dark:border-slate-800">
+                  🔒 {t.rsrdTitle}
+                </div>
+              )}
             </div>
 
-            <section>
-              <h2 className="mb-3 text-lg font-bold">{t.explainTitle}</h2>
-              <Explanation names={names} inputs={inputs} result={result} priceMode={priceMode} />
-            </section>
+            {show.cards > 0 && (
+              <section id="learn-explain" className={focus('explain')}>
+                <h2 className="mb-3 text-lg font-bold">{t.explainTitle}</h2>
+                <Explanation names={names} inputs={inputs} result={result} priceMode={priceMode} upTo={show.cards} />
+              </section>
+            )}
 
-            <SummaryTable names={names} result={result} />
+            {show.table && (
+              <div id="learn-table" className={focus('table')}>
+                <SummaryTable names={names} result={result} />
+              </div>
+            )}
           </main>
+        )}
+
+        {learn && (
+          <LearnGuide
+            step={learn.step}
+            vars={{
+              n: names,
+              aXA: fmt(inputs.A.aX, lang),
+              aYA: fmt(inputs.A.aY, lang),
+              lo: fmt(result.priceBand[0], lang),
+              hi: fmt(result.priceBand[1], lang),
+              gainA: signed(result.countries.A.gainPct, lang),
+              gainB: signed(result.countries.B.gainPct, lang),
+            }}
+            icons={icons}
+            result={result}
+            answers={learn.answers}
+            achieved={learn.achieved}
+            onAnswer={(step, choice) => setLearn({ ...learn, answers: { ...learn.answers, [step]: choice } })}
+            onStep={goToStep}
+            onExit={() => setLearn(null)}
+          />
         )}
 
         <footer className="mt-10 border-t border-slate-200 pt-4 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
@@ -250,7 +371,9 @@ function Headline({
   const { comparativeAdvantage: ca, countries } = result
   if (result.tradeCase === 'no-trade') {
     return (
-      <div className="rounded-xl bg-slate-100 px-4 py-3 text-center text-sm font-semibold dark:bg-slate-800">{t.noTradeBadge}</div>
+      <div className="rounded-xl bg-slate-100 px-4 py-3 text-center text-sm font-semibold dark:bg-slate-800">
+        {t.noTradeBadge}
+      </div>
     )
   }
   const stat = (label: string, value: string, tone = '') => (
@@ -261,8 +384,16 @@ function Headline({
   )
   return (
     <div className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-slate-100 p-2 sm:grid-cols-4 dark:border-slate-800 dark:bg-slate-950">
-      {stat(t.exports(names[ca.X!], names.X), `${icons.X} ${fmt(countries[ca.X!].trade.netExports.X, lang)}`, ca.X === 'A' ? 'text-a' : 'text-b')}
-      {stat(t.exports(names[ca.Y!], names.Y), `${icons.Y} ${fmt(countries[ca.Y!].trade.netExports.Y, lang)}`, ca.Y === 'A' ? 'text-a' : 'text-b')}
+      {stat(
+        t.exports(names[ca.X!], names.X),
+        `${icons.X} ${fmt(countries[ca.X!].trade.netExports.X, lang)}`,
+        ca.X === 'A' ? 'text-a' : 'text-b',
+      )}
+      {stat(
+        t.exports(names[ca.Y!], names.Y),
+        `${icons.Y} ${fmt(countries[ca.Y!].trade.netExports.Y, lang)}`,
+        ca.Y === 'A' ? 'text-a' : 'text-b',
+      )}
       {stat(t.tradePrice, `${icons.X}1 = ${icons.Y}${fmt(result.price, lang)}`)}
       {stat(
         t.gain,

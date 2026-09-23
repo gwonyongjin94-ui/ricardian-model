@@ -8,9 +8,11 @@ interface Props {
   inputs: { A: CountryInput; B: CountryInput }
   result: ModelResult
   priceMode: PriceMode
+  /** Number of cards to show, for learn mode. */
+  upTo?: number
 }
 
-export function Explanation({ names, inputs, result, priceMode }: Props) {
+export function Explanation({ names, inputs, result, priceMode, upTo = 5 }: Props) {
   const { t, lang } = useI18n()
   const f = (v: number) => fmt(v, lang)
   const { comparativeAdvantage: ca, absoluteAdvantage: aa, countries, tradeCase } = result
@@ -32,23 +34,25 @@ export function Explanation({ names, inputs, result, priceMode }: Props) {
         ))}
       </Card>
 
-      <Card title={t.step2Title}>
-        <p>{t.step2Good(names.X, nameOf(aa.X))}</p>
-        <p>{t.step2Good(names.Y, nameOf(aa.Y))}</p>
-        <p className="text-slate-500 dark:text-slate-400">{t.step2Note}</p>
-      </Card>
+      {upTo >= 2 && (
+        <Card title={t.step2Title}>
+          <p>{t.step2Good(names.X, nameOf(aa.X))}</p>
+          <p>{t.step2Good(names.Y, nameOf(aa.Y))}</p>
+          <p className="text-slate-500 dark:text-slate-400">{t.step2Note}</p>
+        </Card>
+      )}
 
-      <Card title={t.step3Title} highlight>
-        {s && tt ? (
-          <p>
-            {t.step3(names, names[s], names[tt], f(countries[s].opportunityCost.X), f(countries[tt].opportunityCost.X))}
-          </p>
-        ) : (
-          <p>{t.step3None(f(countries.A.opportunityCost.X))}</p>
-        )}
-      </Card>
+      {upTo >= 3 && (
+        <Card title={t.step3Title} highlight>
+          {s && tt ? (
+            <p>{t.step3(names, names[s], names[tt], f(countries[s].opportunityCost.X), f(countries[tt].opportunityCost.X))}</p>
+          ) : (
+            <p>{t.step3None(f(countries.A.opportunityCost.X))}</p>
+          )}
+        </Card>
+      )}
 
-      {tradeCase !== 'no-trade' && (
+      {upTo >= 4 && tradeCase !== 'no-trade' && (
         <Card title={t.step4Title}>
           <p>{t.step4Band(names, f(result.priceBand[0]), f(result.priceBand[1]))}</p>
           <p className="font-semibold">
@@ -58,27 +62,29 @@ export function Explanation({ names, inputs, result, priceMode }: Props) {
         </Card>
       )}
 
-      <Card title={t.step5Title}>
-        {(['A', 'B'] as const).map((k) => (
-          <p key={k}>
-            <Dot slot={k} />
-            {countries[k].gainPct > 0.005
-              ? t.step5(names[k], signed(countries[k].gainPct, lang).replace('+', ''))
-              : t.step5Zero(names[k])}
-          </p>
-        ))}
-        {tradeCase !== 'no-trade' && (
-          <p className="text-slate-500 dark:text-slate-400">
-            {t.step5Wage(
-              names.A,
-              names.B,
-              f(result.relativeWage.value),
-              f(result.relativeWage.bounds[0]),
-              f(result.relativeWage.bounds[1]),
-            )}
-          </p>
-        )}
-      </Card>
+      {upTo >= 5 && (
+        <Card title={t.step5Title}>
+          {(['A', 'B'] as const).map((k) => (
+            <p key={k}>
+              <Dot slot={k} />
+              {countries[k].gainPct > 0.005
+                ? t.step5(names[k], signed(countries[k].gainPct, lang).replace('+', ''))
+                : t.step5Zero(names[k])}
+            </p>
+          ))}
+          {tradeCase !== 'no-trade' && (
+            <p className="text-slate-500 dark:text-slate-400">
+              {t.step5Wage(
+                names.A,
+                names.B,
+                f(result.relativeWage.value),
+                f(result.relativeWage.bounds[0]),
+                f(result.relativeWage.bounds[1]),
+              )}
+            </p>
+          )}
+        </Card>
+      )}
     </div>
   )
 }
