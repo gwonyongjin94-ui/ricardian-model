@@ -1,5 +1,7 @@
 # Ricardian Model Explorer · 리카도 모형 탐색기
 
+**▶ 바로 사용하기 · Live demo: https://gwonyongjin94-ui.github.io/ricardian-model/**
+
 세계지도에서 두 나라와 두 재화를 골라 **비교우위 → 특화 → 교역가격 → 교역이익**을 눈으로 따라가는 인터랙티브 웹 앱입니다.
 
 An interactive web app for the two-country, two-good Ricardian model. Pick two countries on a world map and two goods, and follow the logic from opportunity cost to gains from trade.
