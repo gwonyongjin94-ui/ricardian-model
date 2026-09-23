@@ -6,6 +6,8 @@
 
 An interactive web app for the two-country, two-good Ricardian model. Pick two countries on a world map and two goods, and follow the logic from opportunity cost to gains from trade.
 
+![한국·베트남 예시로 나라를 바꾸고 교역가격을 직접 움직이는 데모](docs/demo.gif)
+
 ## 기능 · Features
 
 - **세계지도에서 국가 선택**: 클릭 또는 검색으로 고르면 두 나라에 맞춰 지도가 자동으로 확대됩니다. 수출 방향은 재화 아이콘이 날아가는 화살표로 표시합니다.
@@ -18,6 +20,28 @@ An interactive web app for the two-country, two-good Ricardian model. Pick two c
 - **예시 시나리오**: 리카도의 원래 예시(영국·포르투갈), 한국·베트남, 큰 나라 케이스, 교역이 일어나지 않는 경우를 불러올 수 있습니다.
 - **🎓 학습 모드**: 9단계 가이드가 관련 화면을 차례로 강조합니다. 퀴즈 3개(기회비용, 절대우위, 수출품)에 답해야 해당 결과가 공개되고, 직접 조작하면 자동으로 체크되는 과제(가격을 끝까지 움직이기, 교역 방향 뒤집기, 교역 없애기)가 있습니다.
 - **한국어 / English** 전환
+
+## 스크린샷 · Screenshots
+
+**메인 화면**: 두 나라의 교역 방향과 양, 교역가격, 교역이익을 한눈에 보여줍니다.
+
+![리카도의 원래 예시(영국·포르투갈) 메인 화면](docs/screenshot-ko.png)
+
+**차트**: 두 나라의 생산가능곡선(자급자족점 ○, 교역 후 생산점 ■, 교역 후 소비점 ●)과 세계 상대공급·상대수요 곡선입니다.
+
+![생산가능곡선과 RS–RD 차트](docs/charts-ko.png)
+
+**단계별 해설**: 실제 입력값을 대입한 계산 과정을 카드로 보여줍니다.
+
+![단계별 해설 카드](docs/explanation-ko.png)
+
+**🎓 학습 모드**: 퀴즈에 답하면 지도에 교역 화살표가 나타납니다.
+
+![학습 모드의 수출품 퀴즈](docs/learn-mode-ko.png)
+
+**English UI**
+
+![English UI with the Korea–Vietnam example](docs/screenshot-en.png)
 
 ## 모형 · The model
 
@@ -42,7 +66,10 @@ npm install
 npm run dev      # http://localhost:5173
 npm test         # model unit tests
 npm run build    # production build in dist/
+npm run capture  # regenerate docs/ screenshots and demo.gif (uses local Google Chrome)
 ```
+
+`npm run capture`는 로컬에 설치된 Google Chrome을 사용합니다. 경로가 다르면 `CHROME_PATH` 환경변수로 지정하세요.
 
 ## 배포 · Deployment
 
