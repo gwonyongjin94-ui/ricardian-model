@@ -156,7 +156,7 @@ export default function App() {
           </p>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
           <section className="space-y-3">
             <div className="flex items-stretch gap-2">
               <CountryPicker slot="A" value={selected.A} active={activeSlot === 'A'} onActivate={() => setActiveSlot('A')} onPick={pick} />
@@ -204,7 +204,7 @@ export default function App() {
           <p className="mt-10 text-center text-slate-500">{result.errors.length ? t.invalid : t.pickTwo}</p>
         ) : (
           <main className="mt-8 space-y-6">
-            <div className="grid gap-4 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
               {(['A', 'B'] as const).map((k) => (
                 <PPFChart
                   key={k}

@@ -22,7 +22,7 @@ export function Explanation({ names, inputs, result, priceMode }: Props) {
     priceMode === 'equilibrium' ? (tradeCase === 'A-large' ? names.A : tradeCase === 'B-large' ? names.B : null) : null
 
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
       <Card title={t.step1Title}>
         {(['A', 'B'] as const).map((k) => (
           <p key={k}>
